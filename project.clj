@@ -31,7 +31,7 @@
                  [com.cemerick/piggieback "0.2.2"]
                  [cheshire "5.6.3"]
 
-                 [clj-chrome-devtools "0.2.2"]
+                 [clj-chrome-devtools "0.2.3"]
 
                  [ring "1.6.3"]
 
