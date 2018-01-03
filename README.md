@@ -7,6 +7,9 @@
   * still need to be loaded somehow, and loaded in the right order.
   * does this mean compile+run rather than eval?
   * does this mean walking the dependency tree backwards?
+* treat the whole API like a giant map, a la the kubernetes API  
+* abstract some of the specifics of CDP? in case there are similiar 
+  browser technologies for which we want cobalt to work  
 
 ## Goals
 

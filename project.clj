@@ -36,7 +36,8 @@
                  [ring "1.6.3"]
 
                  [com.andrewmcveigh/cljs-time "0.5.2"]
-                 [funcool/httpurr "1.0.0"]]
+                 [funcool/httpurr "1.0.0"]
+                 [org.clojure/core.match "0.3.0-alpha5"]]
 
   :exclusions [commons-logging
                log4j

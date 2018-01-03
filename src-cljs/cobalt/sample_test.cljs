@@ -11,8 +11,8 @@
         base-url "https://google.com"]
     (http/get client base-url)
     #_(js/Promise.
-        (fn [resolve reject]
-          (async/take! chan resolve)))))
+       (fn [resolve reject]
+         (async/take! chan resolve)))))
 
 (comment
 
@@ -23,6 +23,4 @@
 
   (def pt (query-target "foobar"))
 
-  (.then pt #(prn (type %)))
-
-  )
+  (.then pt #(prn (type %))))

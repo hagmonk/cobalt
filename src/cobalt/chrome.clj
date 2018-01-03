@@ -1,14 +1,9 @@
 (ns cobalt.chrome
-  (:require
-    [clojure.tools.logging :refer [info error debug]]
-
-    [org.httpkit.client :as http]
-
-    [clj-chrome-devtools.impl.connection :refer [connect]])
+  (:require [clojure.tools.logging :refer [info error debug]]
+            [org.httpkit.client :as http]
+            [clj-chrome-devtools.impl.connection :refer [connect]])
   (:import (java.net ServerSocket InetAddress)
            (java.io File)))
-
-
 
 (defn get-available-port
   "Allocate a socket on a random port on the loopback address, then
@@ -55,35 +50,11 @@
     (doseq [v args]
       (debug "arg" v))
     (assoc opts
-      :args args
-      :proc (.exec
-              (Runtime/getRuntime)
-              (into-array String args)))))
+           :args args
+           :proc (.exec
+                  (Runtime/getRuntime)
+                  (into-array String args)))))
 
 (defn terminate-chrome-process
   [{:keys [proc]}]
   (.destroy proc))
-
-(comment
-
-  (let [[host port] ((juxt :remote-debugging-address :remote-debugging-port)
-                      @test-instance)]
-    (info host port)
-    (clj-chrome-devtools.impl.connection/inspectable-pages host port)
-
-    #_@(http/get
-       (format "http://%s:%s/json/list" host port)))
-
-
-
-
-
-
-  (def test-instance (atom nil))
-
-  (reset! test-instance (start-chrome-process {:command     "C:\\Users\\lukeb\\AppData\\Local\\Google\\Chrome SxS\\Application\\chrome.exe"
-                                               :disable-gpu false
-                                               :headless    false
-                                               :pages       ["http://localhost:8089"]}))
-
-  )

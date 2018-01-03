@@ -1,45 +1,31 @@
 (ns cobalt.devtools
-  (:require
-    [clojure.java.io :as io]
-    [clojure.core.async :as async]
-    [clojure.tools.logging :refer [info error debug]]
-
-    [ring.middleware.file :refer [wrap-file]]
-    [org.httpkit.server :refer [run-server]]
-    [org.httpkit.client :as http]
-
-    [clj-chrome-devtools.impl.connection :refer [connect-url inspectable-pages]]
-    [clj-chrome-devtools.events :as event]
-    [clj-chrome-devtools.commands.runtime :as runtime]
-    [clj-chrome-devtools.commands.network :as network]
-    [clj-chrome-devtools.commands.browser :as browser]
-    [clj-chrome-devtools.commands.dom :as dom]
-    [clj-chrome-devtools.commands.page :as page]
-    [clj-chrome-devtools.commands.log :as log]
-
-    [cobalt.chrome :refer [start-chrome-process]]
-    [clojure.string :as str])
-  )
+  (:require [clojure.java.io :as io]
+            [clojure.core.async :as async]
+            [clojure.tools.logging :refer [info error debug]]
+            [clj-chrome-devtools.impl.connection :refer [connect-url inspectable-pages]]
+            [clj-chrome-devtools.events :as event]
+            [clj-chrome-devtools.commands.runtime :as runtime]
+            [clj-chrome-devtools.commands.dom :as dom]
+            [cobalt.chrome :refer [start-chrome-process]]
+            [cobalt.events :refer [setup-log-events!]]
+            [clojure.string :as str])
+  (:import (java.io File)))
 
 (defn select-devtools-page
   [{:keys [devtools-host devtools-port devtools-page] :as opts}]
   (info opts)
   (let [pages (inspectable-pages devtools-host devtools-port)]
-    (cond->> pages
-             (instance? (type #"") devtools-page)
-             (filter (comp (partial re-find devtools-page) :url))
+    (->> (cond->> pages
+                  (instance? (type #"") devtools-page)
+                  (filter (comp (partial re-find devtools-page) :url))
 
-             (string? devtools-page)
-             (filter (comp #{devtools-page} :url))
+                  (string? devtools-page)
+                  (filter (comp #{devtools-page} :url))
 
-             (nil? devtools-page)
-             (take 1)
-
-             :then
-             (keep :web-socket-debugger-url)
-
-             :and
-             first)))
+                  (nil? devtools-page)
+                  (take 1))
+         (keep :web-socket-debugger-url)
+         first)))
 
 (defn maybe-launch-chrome
   [{:keys [devtools-host devtools-port chrome] :as opts}]
@@ -62,14 +48,8 @@
   [opts]
   (let [opts (maybe-launch-chrome opts)
         url  (select-devtools-page opts)
-        _    (info url)
         conn (connect-url url)]
-    (doto conn
-      (runtime/enable {})
-      (dom/enable {})
-      (page/enable {})
-      (network/enable {})
-      (log/enable {}))
+    (setup-log-events! conn)
     (assoc opts :conn conn)))
 
 (defn eval-str
@@ -81,23 +61,26 @@
       (error str))
     res))
 
+; TODO: Compile could be a protocol, extended to resources, strings, etc
 (defn compile-resource
   [conn res]
-  (let [source-url (-> (.getPath res)
-                       (str/split #"out/")
-                       last)
-        res        (runtime/compile-script conn
-                                           {:expression     (slurp res)
-                                            :source-url     source-url
-                                            :persist-script true})]
+  (let [separator (File/separator)
+        source-url (-> res
+                       .getPath
+                       (str/split #"out")
+                       last
+                       (str/replace-first separator "")
+                       (str/replace separator "/"))
+        res        (runtime/compile-script
+                     conn
+                     {:expression     (slurp res)
+                      :source-url     source-url
+                      :persist-script true})]
     res))
 
 (defn run-script
   [conn script-id]
   (runtime/run-script conn {:script-id script-id}))
-
-; TODO: Compile could be a protocol, extended to resources, strings, etc
-
 
 (defn eval-resource
   [conn resource-path]
@@ -112,8 +95,6 @@
   (debug "eval-file" path)
   (eval-str conn (slurp path)))
 
-
-
 (defn- test-thing [connection]
   (let [ch (event/listen connection :page :frame-stopped-loading)]
     (debug "in here")
@@ -124,35 +105,3 @@
           (debug "Document updated, new root: " root))
         (recur (async/<! ch))))))
 
-(defn monitor-events
-  [conn]
-  (let [c (event/listen conn :runtime :exception-thrown)
-        l (event/listen conn :log :entry-added)]
-    (async/go-loop []
-      (if-let [[p v] (async/alts! [c l])]
-        (do
-          (debug "received event" v "from" p)
-          (recur))
-
-        (debug "Finished monitoring events")))))
-
-(comment
-
-  (inspectable-pages "localhost" 50502)
-
-  (select-devtools-page {:devtools-host "localhost" :devtools-port 50502 :devtools-page nil})
-
-  (:root (dom/get-document (:conn @cobalt.repl/test-repl) {}))
-
-  (browser/get-version (:conn @cobalt.repl/test-repl) {})
-
-  #_(runtime/enable (:conn @test-repl) {})
-  (monitor-events (:conn @test-repl))
-
-
-  (runtime/evaluate (:conn @cobalt.repl/test-repl) {:expression "console.log('hi there');" :return-by-value true})
-  (runtime/evaluate (:conn @cobalt.repl/test-repl) {:expression "goog.global.document" :return-by-value true})
-  (runtime/evaluate (:conn @test-repl) {:expression "typeof goog" :return-by-value true})
-  (runtime/evaluate (:conn @test-repl) {:expression "b" :return-by-value true})
-
-  )
