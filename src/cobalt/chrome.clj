@@ -1,9 +1,45 @@
 (ns cobalt.chrome
   (:require [clojure.tools.logging :refer [info error debug]]
             [org.httpkit.client :as http]
-            [clj-chrome-devtools.impl.connection :refer [connect]])
+            [clj-chrome-devtools.impl.connection :refer [connect]]
+            [clojure.string :as str]
+            [clojure.java.shell :as sh]
+            [clojure.java.io :as io])
   (:import (java.net ServerSocket InetAddress)
            (java.io File)))
+
+(defn find-chrome-unix
+  []
+  (let [search-paths ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                      "/Applications/Chromium.app/Contents/MacOS/Chromium"
+                      "google-chrome-stable"
+                      "google-chrome"
+                      "chromium-browser"
+                      "chromium"]
+        find-fn      #(sh/sh "which" %)]
+    (some find-fn search-paths)))
+
+(defn find-chrome-windows
+  []
+  (let [search-envs  ["LOCALAPPDATA"
+                      "ProgramFiles"
+                      "ProgramFiles(x86)"]
+        search-paths (->> search-envs
+                          (map #(System/getenv %))
+                          (map #(io/file % "Google"))
+                          (map (memfn getAbsolutePath)))
+        find-fn      #(sh/sh "where.exe" "/r" % "chrome.exe")]
+    (some find-fn search-paths)))
+
+(defn guess-chrome-binary
+  "Take a wild swing at finding the binary we're supposed to use for Chrome."
+  []
+  (let [exe (condp re-find (System/getenv "os")
+              #"^Windows" (find-chrome-windows)
+              ;; Other OS regexes here, if necessary
+              ;; By default try unix-like
+              (find-chrome-unix))]
+    (some-> exe :out str/trim-newline)))
 
 (defn get-available-port
   "Allocate a socket on a random port on the loopback address, then
@@ -26,7 +62,9 @@
      (.getAbsolutePath f))))
 
 (defn start-chrome-process
-  [{:keys [command remote-debugging-address remote-debugging-port user-data-dir page] :as opts}]
+  [{:keys [command remote-debugging-address remote-debugging-port user-data-dir page]
+    :or   {command (guess-chrome-binary)}
+    :as   opts}]
   (assert command)
   (let [addr (or (some-> remote-debugging-address InetAddress/getByName)
                  (InetAddress/getLoopbackAddress))
@@ -50,10 +88,10 @@
     (doseq [v args]
       (debug "arg" v))
     (assoc opts
-           :args args
-           :proc (.exec
-                  (Runtime/getRuntime)
-                  (into-array String args)))))
+      :args args
+      :proc (.exec
+              (Runtime/getRuntime)
+              (into-array String args)))))
 
 (defn terminate-chrome-process
   [{:keys [proc]}]

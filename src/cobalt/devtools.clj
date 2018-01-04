@@ -97,13 +97,4 @@
   (debug "eval-file" path)
   (eval-str conn (slurp path)))
 
-(defn- test-thing [connection]
-  (let [ch (event/listen connection :page :frame-stopped-loading)]
-    (debug "in here")
-    (async/go-loop [v (async/<! ch)]
-      (debug "in loop")
-      (when v
-        (let [root (:root (dom/get-document connection {}))]
-          (debug "Document updated, new root: " root))
-        (recur (async/<! ch))))))
 

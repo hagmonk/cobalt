@@ -1,16 +1,16 @@
 
 # Cobalt REPL
 
-A ClojureScript REPL mixed with the Chrome DevTools Protocol (CDP). 
+A ClojureScript REPL mixed with the Chrome DevTools Protocol (CDP).
 Cobalt + Chrome = Cobalt-Chrome, a particularly strong alloy.
 
 ## Goals
 
-**Headless browser based REPL development**. I want to start a real browser based REPL 
+**Headless browser based REPL development**. I want to start a real browser based REPL
 without having to interact with a browser window, but while keeping visibility into the
-browser's state, console logs, network activity, etc. 
+browser's state, console logs, network activity, etc.
 
-**Inject a ClojureScript runtime into any page**. I would like to "REPL in" to any arbitrary web 
+**Inject a ClojureScript runtime into any page**. I would like to "REPL in" to any arbitrary web
 page, without having to touch the hosting environment of the page itself.
 
 **Virtual machine access**. When my Clojure program misbehaves or becomes opaque, I can
@@ -20,9 +20,9 @@ visibility into my browser based ClojureScript code.
 ## Motivation
 
 It started off as a personal project, to learn more about the innards of ClojureScript.
-I wanted to teach my kids ClojureScript, and decided (foolishly, in hindsight) to 
+I wanted to teach my kids ClojureScript, and decided (foolishly, in hindsight) to
 ramp up my ClojureScript skills by writing a Grafana plugin. This exposed me to much of the
-hackery involved in getting ClojureScript actually running inside a browser, connecting a 
+hackery involved in getting ClojureScript actually running inside a browser, connecting a
 REPL, handling JS modules, and more.
 
 I started to wonder why I couldn't just blast things from the REPL into the browser using
@@ -35,55 +35,44 @@ So far, it's possible to load the cobalt.sample-test namespace and play around w
 
 This namespace relies on [httpurr](https://github.com/funcool/httpurr), chosen because
 it also has a foreign-libs dependency on the Bluebird promises library, which forced me
-to not be lazy and learn how the heck that stuff works (I still have no idea, but it works). 
+to not be lazy and learn how the heck that stuff works (I still have no idea, but it works).
 
 I also listen for CDP runtime and log domain events and relay those to the Clojure logs,
 allowing you to watch errors on the JS side get logged in REPL.
 
 ```
 git clone git@github.com:hagmonk/cobalt.git && cd cobalt
-mkdir checkouts 
+mkdir checkouts
 cd checkouts && git clone git@github.com:hagmonk/clj-chrome-devtools
 cd .. && lein repl
 ```
 
-The clj-chrome-devtools checkout from my fork is required while I'm still in heavy 
+The clj-chrome-devtools checkout from my fork is required while I'm still in heavy
 development. I've already merged one set of changes upstream, but there are more PRs
 to come.
 
-Now, start a repl environment in the cobalt.debug namespace. This will start a non-headless
-Chrome instance for debug purposes.
+Now, start a repl environment. This will start a non-headless Chrome instance for debug purposes,
+compile the cobalt/sample_test.cljs file and associated dependencies, and load them. After which you
+should be left in a ClojureScript REPL.
 
 ```
-(new-repl {})
+(cobalt.repl/repl {:filename "cobalt/sample_test.cljs"})
 ```
 
-Drop the current REPL into ClojureScript mode:
+Try evaluating some test ClojureScript. The following function should be available, which will make an
+XHR call to the github API:
 
 ```
-(cljs {:filename "cobalt/sample_test.cljs"})
-```
-
-In the cobalt.sample-test namespace, try evaluating some test ClojureScript. First wire up
-some missing REPL functionality:
-
-```
-(do
-    (set! *print-fn* js/console.info)
-    (set! *print-err-fn* js/console.error)
-    (set! *print-newline* true))
-```
-
-Then try:
-
-```
-(promesa.core/then (query-target "test") (fn [resolved] (prn resolved)))
+(cobalt.sample-test/query-target)
 ```
 
 ## Bugs / Incomplete functionality
 
 This is a massively incomplete list.
 
-* define *print-fn* and friend in cljs on bootstrap 
+* define *print-fn* and friend in cljs on bootstrap
 * eval of whole file makes goog.provide complain about already defined ns.
 * websocket CDP connection to browser keeps timing out?? :(
+* handle errors in IJavaScriptEnv/-evaluate
+* why isn't IJavaScriptEnv/-load being called?
+* pretty printing ain't workin'

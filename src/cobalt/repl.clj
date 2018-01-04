@@ -6,7 +6,8 @@
     [cljs.env :as env]
     [cljs.closure :as closure]
     [cljs.js-deps :refer [js-dependency-index dependency-order]]
-    [clojure.java.io :as io]))
+    [clojure.java.io :as io]
+    [cemerick.piggieback :as piggie]))
 
 ;; TODO: change filename to main, find right file based on that
 ;; TODO: move all this into pedestal interceptors to clean things up
@@ -17,8 +18,8 @@
    {:keys [filename output-dir]
     :or   {output-dir "out"
            filename   "cljs/core.cljs"}
-    :as arg-opts}]
-  (debug "bootstrap-repl" (pr-str arg-opts))
+    :as   arg-opts}]
+  (debug "bootstrap-repl compiling" filename)
   (env/ensure
     (let [core     (io/resource filename)
 
@@ -61,7 +62,12 @@
       ;; evaluate addDependencies
       (dt/eval-str conn deps)
       ;; evaluate the rest of the stuff
-      (doall (map (partial dt/run-script conn) (rest compiled))))))
+      (doall (map (partial dt/run-script conn) (rest compiled)))
+
+      (dt/eval-str conn (closure/-compile
+                          '[(set! *print-fn* js/console.info)
+                            (set! *print-err-fn* js/console.error)
+                            (set! *print-newline* true)] {})))))
 
 
 (def repl-filename "<cljs repl>")
@@ -75,30 +81,29 @@
 
   (-evaluate [_ filename line js]
     (let [response (dt/eval-str conn js)
-          result (:result response)]
+          result   (:result response)]
+      ;; TODO: handle errors :/
       {:status :success
-       :value (some-> result :value str)}))
+       :value  (some-> result :value str)}))
 
   (-load [_ ns url]
-    (debug "load: " ns)
+    (debug "LOAD CALLED??" ns)
     (dt/eval-resource conn url))
 
   (-tear-down [_]
-    (debug "tear-down")))
+    (when-let [proc (some-> conn :chrome :proc)]
+      (debug "tearing down chrome session")
+      (.destroy ^Process proc))))
 
 (defn bootstrap-cdp
   "Start a new connection to a Chrome DevTools instance"
   [opts]
-  #_(when-let [proc (some-> opts :chrome :proc)]
-    (.destroy ^Process proc))
-
   (let [opts' (merge-with
                 merge
                 {:chrome
-                 {:command     "/Applications/Chromium.app/Contents/MacOS/Chromium"
-                  :disable-gpu true
+                 {:disable-gpu true
                   :headless    true
-                  :page "about:blank"}}
+                  :page        "about:blank"}}
                 opts)]
     (dt/connect-devtools opts')))
 
@@ -106,3 +111,9 @@
   (let [conn (bootstrap-cdp opts)]
     (DevtoolsEnv. conn)))
 
+(defn repl
+  [opts]
+  (let [default {:chrome {:disable-gpu false
+                          :headless    false}}
+        opts'   (merge-with merge default opts)]
+    (apply piggie/cljs-repl (repl-env opts') (mapcat identity opts'))))

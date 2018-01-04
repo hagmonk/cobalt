@@ -14,6 +14,8 @@
 
 (defonce cdp-repl (atom {}))
 
+
+
 (defn new-repl
   "Start a new REPL environment."
   [opts]
@@ -22,8 +24,7 @@
               (.destroy ^Process proc))
             (let [opts' (merge-with
                           merge
-                          {:chrome {:command     "/Applications/Chromium.app/Contents/MacOS/Chromium"
-                                    :disable-gpu false
+                          {:chrome {:disable-gpu false
                                     :headless    false}}
                           opts)]
               (rp/repl-env opts')))]

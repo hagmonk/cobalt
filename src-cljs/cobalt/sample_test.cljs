@@ -5,15 +5,8 @@
             [httpurr.client :as http]
             [httpurr.client.xhr :refer [client]]
             [goog.crypt.base64 :as base64]
-            [promesa.core :as p]))
-
-(comment
-  ;; TODO: run me in repl setup
-  ;; https://github.com/clojure/clojurescript/blob/master/src/main/clojure/cljs/repl/browser.clj#L148
-  (do
-    (set! *print-fn* js/console.info)
-    (set! *print-err-fn* js/console.error)
-    (set! *print-newline* true)))
+            [promesa.core :as p]
+            [clojure.pprint :refer [pprint]]))
 
 (defn auth-header
   [user password]
@@ -24,12 +17,13 @@
              "Authorization" (auth-header "foo" "bar")
              "Accept" "application/json"}})
 
-(defn ^:export query-target
-  [query]
-  (let [chan [] #_(async/promise-chan)
-        base-url "https://api.github.com/users/hagmonk/events/public"]
-    (http/get client base-url
-              {})))
+(defn query-target
+  []
+  (let [base-url "https://api.github.com/users/hagmonk/events/public?per_page=1"]
+    (p/chain
+      (http/get client base-url {})
+      (fn [r] (update r :body js/JSON.parse))
+      (fn [r] (prn (:body r))))))
 
 (comment
 
@@ -39,7 +33,7 @@
 
   (js/console.log "what")
 
-  (promesa.core/then (query-target "test") (fn [resolved] (prn resolved)))
+  (p/then (query-target) (fn [resolved] (pprint (:body resolved))))
 
   (def pt (query-target "foobar"))
 
