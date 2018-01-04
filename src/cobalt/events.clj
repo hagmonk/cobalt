@@ -3,6 +3,7 @@
             [clojure.tools.logging :refer [info warn error debug trace]]
             [clj-chrome-devtools.events :as event]
             [clj-chrome-devtools.commands.runtime :as runtime]
+            [clj-chrome-devtools.commands.log :as log]
             [clojure.core.async :as async]))
 
 (defn console-api-called
@@ -27,9 +28,19 @@
         (console-api-called e)
         (recur)))))
 
+(defn log-log
+  [conn]
+  (let [c (event/listen conn :log :entry-added)]
+    (async/go-loop []
+      (when-let [e (async/<! c)]
+        (info e)
+        (recur)))))
+
 (defn setup-log-events!
   [conn]
   (doto conn
     (runtime/enable {})
-    log-console-calls))
+    (log/enable {})
+    log-console-calls
+    log-log))
 

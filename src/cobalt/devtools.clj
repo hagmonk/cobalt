@@ -50,13 +50,15 @@
         url  (select-devtools-page opts)
         conn (connect-url url)]
     (setup-log-events! conn)
-    (assoc opts :conn conn)))
+    (assoc conn :chrome (:chrome opts))))
 
 (defn eval-str
   [conn str]
   (let [res     (runtime/evaluate conn {:expression str :return-by-value true})
-        subtype (some-> res :result :subtype)]
-    (when (= subtype "error")
+        subtype (some-> res :result :subtype)
+        exp (some-> res :exception :subtype)]
+    (when (or (= subtype "error")
+              (= exp "error"))
       (error res)
       (error str))
     res))
