@@ -34,7 +34,7 @@
 (defn guess-chrome-binary
   "Take a wild swing at finding the binary we're supposed to use for Chrome."
   []
-  (let [exe (condp re-find (System/getenv "os")
+  (let [exe (condp re-find (or (System/getenv "os") "")
               #"^Windows" (find-chrome-windows)
               ;; Other OS regexes here, if necessary
               ;; By default try unix-like
